@@ -1,0 +1,66 @@
+name: X market & news scan
+
+on:
+  schedule:
+    # Every 6 hours (UTC). GitHub may start scheduled runs a few minutes late.
+    - cron: "17 */6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # needed only if COMMIT_REPORTS is enabled
+
+concurrency:
+  group: x-scanner
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: x_scanner
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: x_scanner/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - name: Run scan
+        env:
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: python -m x_scanner.main --out reports
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x-briefing-${{ github.run_id }}
+          path: x_scanner/reports/
+          retention-days: 30
+
+      # Optional: keep a history of briefings in the repo.
+      # Set the repository variable COMMIT_REPORTS=true to enable.
+      - name: Commit report to repo
+        if: success() && vars.COMMIT_REPORTS == 'true'
+        run: |
+          git config user.name "x-scanner-bot"
+          git config user.email "x-scanner-bot@users.noreply.github.com"
+          git add reports/
+          git commit -m "X briefing $(date -u +'%Y-%m-%d %H:%M') UTC" || exit 0
+          git push

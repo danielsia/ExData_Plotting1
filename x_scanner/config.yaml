@@ -1,0 +1,34 @@
+# X Market & News Scanner configuration
+#
+# Each category runs one or more X (Twitter) recent-search queries. Queries use
+# the X API v2 search syntax: https://docs.x.com/x-api/posts/search/integrate/build-a-query
+# `-is:retweet` and `lang:en` keep the signal-to-noise ratio reasonable.
+
+lookback_hours: 6          # how far back each scan looks (match the schedule)
+max_posts_per_query: 100   # X API max per request is 100
+max_pages_per_query: 2     # pages of 100 to fetch per query (watch your X API quota)
+posts_per_category_for_llm: 120  # top-N posts (by engagement) sent to Claude per category
+min_likes: 5               # drop low-engagement posts before ranking
+
+categories:
+  stocks:
+    title: "Stocks & Equities"
+    queries:
+      - '(stocks OR "stock market" OR earnings OR "S&P 500" OR nasdaq OR $SPY OR $QQQ) -is:retweet lang:en'
+      - '($NVDA OR $AAPL OR $MSFT OR $TSLA OR $AMZN OR $META OR $GOOGL) -is:retweet lang:en'
+    # Optional: posts from these accounts are always included (no engagement filter)
+    accounts: []
+
+  crypto:
+    title: "Crypto"
+    queries:
+      - '(bitcoin OR $BTC OR ethereum OR $ETH OR solana OR $SOL OR crypto) -is:retweet lang:en'
+      - '(ETF OR SEC OR stablecoin OR "on-chain" OR defi) (crypto OR bitcoin OR ethereum) -is:retweet lang:en'
+    accounts: []
+
+  news:
+    title: "Key News Developments"
+    queries:
+      - '(breaking OR BREAKING OR "just in" OR "JUST IN") -is:retweet lang:en'
+      - '("Federal Reserve" OR Fed OR inflation OR CPI OR tariffs OR geopolitics OR election) -is:retweet lang:en'
+    accounts: []
